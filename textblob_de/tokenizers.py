@@ -11,8 +11,6 @@
 """Various tokenizer implementations."""
 from __future__ import absolute_import
 
-import re
-
 import string
 
 from itertools import chain
@@ -197,7 +195,16 @@ class PatternTokenizer(BaseTokenizer):
                                    linebreak=r"\n{2,}")
         
         if chain_punc:
-            sentences = [re.sub(r' (?=[,;:\.\?\!])', '', sentence) for sentence in sentences]
+            chain_char_map = {f" {char}": char for char in ",;:.?!"}
+            chained_sentences = []
+
+            for sentence in sentences:
+                for search, replace in chain_char_map.items():
+                    sentence = sentence.replace(search, replace)
+
+                chained_sentences.append(sentence)
+
+            sentences = chained_sentences
 
         return sentences
 
