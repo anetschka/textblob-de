@@ -11,6 +11,8 @@
 """Various tokenizer implementations."""
 from __future__ import absolute_import
 
+import re
+
 import string
 
 from itertools import chain
@@ -152,25 +154,27 @@ class PatternTokenizer(BaseTokenizer):
     def __init__(self):
         self.tokens = []
 
-    def tokenize(self, text, include_punc=True, nested=False):
+    def tokenize(self, text, include_punc=True, nested=False, chain_punc=False):
         """Return a list of word tokens.
 
         :param text: string of text.
         :param include_punc: (optional) whether to include punctuation as separate
             tokens. Default to True.
+        :param chain_punc: (optional) Only to be used with include_punc=True.
+             If false, punctuation marks are separated by whitespace. Default to False.
 
         """
         self.tokens = [
             w for w in (
                 self.word_tokenize(
                     s,
-                    include_punc) for s in self.sent_tokenize(text))]
+                    include_punc, chain_punc) for s in self.sent_tokenize(text, chain_punc))]
         if nested:
             return self.tokens
         else:
             return list(chain.from_iterable(self.tokens))
 
-    def sent_tokenize(self, text, **kwargs):
+    def sent_tokenize(self, text, chain_punc=False, **kwargs):
         """Returns a list of sentences.
 
         Each sentence is a space-separated string of tokens (words).
@@ -178,6 +182,8 @@ class PatternTokenizer(BaseTokenizer):
         Punctuation marks are split from other words. Periods (or ?!) mark the end of a sentence.
         Headings without an ending period are inferred by line breaks.
 
+        :param chain_punc: (optional) Only to be used with include_punc=True.
+             If false, punctuation marks are separated by whitespace. Default to False.
         """
 
         sentences = find_sentences(text,
@@ -189,9 +195,18 @@ class PatternTokenizer(BaseTokenizer):
                                        ABBREVIATIONS_DE),
                                    replace=kwargs.get("replace", replacements),
                                    linebreak=r"\n{2,}")
+        
+        if chain_punc:
+            sentences = [re.sub(r' (?=[,;:\.\?\!])', '', sentence) for sentence in sentences]
+
         return sentences
 
-    def word_tokenize(self, sentences, include_punc=True):
+    def word_tokenize(self, sentences, include_punc=True, chain_punc=False):
+        """
+        :param chain_punc: (optional) Only to be used with include_punc=True.
+             If false, punctuation marks are separated by whitespace. Default to False.
+        """
+        
         #: Do not process empty strings (Issue #3)
         if sentences.strip() == "":
             return []
@@ -203,7 +218,9 @@ class PatternTokenizer(BaseTokenizer):
                     return _tokens
                 else:
                     return []
-        if include_punc:
+        if include_punc and chain_punc:
+            return _tokens
+        elif include_punc:
             last_word = _tokens[-1]
             # Make sure that you do not separate '.' tokens into ['', '.']
             # (Issue #5)
